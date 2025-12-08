@@ -1,10 +1,10 @@
-// netlify/functions/sendTelegram.js
+// api/sendTelegram.js
 // Diagnostic + HTML-safe version that avoids Markdown parse errors
 
-exports.handler = async function(event, context) {
+export default async function handler(req, res) {
   // Only accept POST
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method not allowed' };
+  if (req.method !== 'POST') {
+    return res.status(405).send('Method not allowed');
   }
 
   const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
@@ -15,37 +15,44 @@ exports.handler = async function(event, context) {
     if (!TELEGRAM_TOKEN) missing.push('TELEGRAM_TOKEN');
     if (!TELEGRAM_CHAT_ID) missing.push('TELEGRAM_CHAT_ID');
     console.error('Missing env vars:', missing.join(', '));
-    return { statusCode: 500, body: 'Missing env vars: ' + missing.join(', ') };
+    return res
+      .status(500)
+      .send('Missing env vars: ' + missing.join(', '));
   }
 
   // parse JSON safely
   let payload = {};
   try {
-    payload = JSON.parse(event.body || '{}');
+    if (typeof req.body === 'string') {
+      payload = JSON.parse(req.body || '{}');
+    } else {
+      // Next.js / Vercel usually gives parsed JSON here
+      payload = req.body || {};
+    }
   } catch (err) {
     console.error('Invalid JSON:', err && err.message);
-    return { statusCode: 400, body: 'Invalid JSON' };
+    return res.status(400).send('Invalid JSON');
   }
 
   // escape for HTML (we'll post with parse_mode = 'HTML')
-  function escHTML(s){
+  function escHTML(s) {
     if (s === null || s === undefined) return '';
     return String(s)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;');
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   // truncate long fields to avoid message length issues
-  function short(s, n = 800){
+  function short(s, n = 800) {
     if (s === null || s === undefined) return '';
     s = String(s);
-    return s.length > n ? escHTML(s.slice(0,n)) + '…(truncated)' : escHTML(s);
+    return s.length > n ? escHTML(s.slice(0, n)) + '…(truncated)' : escHTML(s);
   }
 
   // mask sensitive values for logs
-  function mask(s){
+  function mask(s) {
     if (!s) return s;
     const ss = String(s);
     if (ss.length <= 2) return '*'.repeat(ss.length);
@@ -67,7 +74,8 @@ exports.handler = async function(event, context) {
 
   // Build HTML message
   let text = '<b>New Submission Received</b>\n\n';
-  if (payload.submittedAt) text += `<b>Time:</b> ${escHTML(payload.submittedAt)}\n\n`;
+  if (payload.submittedAt)
+    text += `<b>Time:</b> ${escHTML(payload.submittedAt)}\n\n`;
 
   if (payload.loanData && typeof payload.loanData === 'object') {
     text += '<b>Loan details:</b>\n';
@@ -110,30 +118,32 @@ exports.handler = async function(event, context) {
         chat_id: TELEGRAM_CHAT_ID,
         text,
         parse_mode: 'HTML',
-        disable_web_page_preview: true
-      })
+        disable_web_page_preview: true,
+      }),
     });
 
     const bodyText = await resp.text();
     console.log('Telegram API status:', resp.status, 'body:', bodyText);
 
     if (!resp.ok) {
-      // return Telegram error body for debugging (Netlify logs already have it)
-      return {
-        statusCode: 502,
-        body: 'Telegram error: ' + bodyText
-      };
+      return res.status(502).send('Telegram error: ' + bodyText);
     }
 
-    // success: return Telegram response body (stringified)
     let parsed;
-    try { parsed = JSON.parse(bodyText); } catch(e){ parsed = bodyText; }
-    return {
-      statusCode: 200,
-      body: typeof parsed === 'string' ? parsed : JSON.stringify(parsed)
-    };
+    try {
+      parsed = JSON.parse(bodyText);
+    } catch (e) {
+      parsed = bodyText;
+    }
+
+    // success
+    if (typeof parsed === 'string') {
+      return res.status(200).send(parsed);
+    } else {
+      return res.status(200).json(parsed);
+    }
   } catch (e) {
     console.error('Fetch error when calling Telegram API:', e && e.message);
-    return { statusCode: 500, body: 'Fetch error: ' + (e && e.message) };
+    return res.status(500).send('Fetch error: ' + (e && e.message));
   }
-};
+}
