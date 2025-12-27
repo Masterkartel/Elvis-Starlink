@@ -6,14 +6,13 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "rewrites": [
+    "headers": [
       {
-        "source": "/sendTelegram",
-        "function": "sendTelegram"
+        "source": "/login.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
       }
     ]
-  },
-  "functions": {
-    "source": "functions"
   }
 }
